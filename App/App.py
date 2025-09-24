@@ -92,10 +92,54 @@ def course_recommender(course_list):
 
 ###### Database Stuffs ######
 
+# Import database configuration
+try:
+    from db_config import DB_CONFIG
+except ImportError:
+    DB_CONFIG = {
+        'host': 'localhost',
+        'user': 'root', 
+        'password': '',
+        'db': 'cv',
+        'charset': 'utf8mb4'
+    }
 
-# sql connector
-connection = pymysql.connect(host='localhost',user='root',password='admin123',db='cv')
-cursor = connection.cursor()
+# Mock database objects for fallback when MySQL is not available
+class MockCursor:
+    def execute(self, query, values=None):
+        if values:
+            print(f"Mock DB: Would execute query with values: {values[:3]}..." if len(values) > 3 else f"Mock DB: Would execute query with values: {values}")
+        else:
+            print(f"Mock DB: Would execute query: {query[:50]}...")
+        pass
+    
+    def fetchall(self):
+        # Return mock data for SELECT queries
+        return []  # Return empty results for queries
+    
+    def commit(self):
+        pass
+    
+class MockConnection:
+    def cursor(self):
+        return MockCursor()
+    
+    def commit(self):
+        print("Mock DB: Would commit transaction")
+        pass
+
+# Try to connect to MySQL, fall back to mock if connection fails
+try:
+    connection = pymysql.connect(**DB_CONFIG)
+    cursor = connection.cursor()
+    print("✅ Connected to MySQL database successfully!")
+    using_real_db = True
+except Exception as e:
+    print(f"⚠️ Could not connect to MySQL database: {e}")
+    print("📝 Using mock database for demo purposes")
+    connection = MockConnection()
+    cursor = connection.cursor()
+    using_real_db = False
 
 
 # inserting miscellaneous data, fetched results, prediction and recommendation into user_data table
@@ -318,9 +362,18 @@ st.markdown("""
 
 def run():
     
+    # Get the directory where the script is located for proper file paths
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
     # (Logo, Heading, Sidebar etc)
-    img = Image.open('./Logo/Resu.png')
-    st.image(img)
+    try:
+        logo_path = os.path.join(script_dir, 'Logo', 'Resu.png')
+        img = Image.open(logo_path)
+        st.image(img)
+    except FileNotFoundError:
+        st.title("📄 Resume Analyzer")
+        st.write("Logo not found, but the app is working!")
+    
     st.sidebar.markdown("# Choose Something...")
     activities = ["User", "Feedback", "About", "Admin"]
     choice = st.sidebar.selectbox("Choose among the given options:", activities)
@@ -453,17 +506,27 @@ def run():
         ip_add = socket.gethostbyname(host_name)
         dev_user = os.getlogin()
         os_name_ver = platform.system() + " " + platform.release()
-        g = geocoder.ip('me')
-        latlong = g.latlng
-        geolocator = Nominatim(user_agent="http")
-        location = geolocator.reverse(latlong, language='en')
-        address = location.raw['address']
-        cityy = address.get('city', '')
-        statee = address.get('state', '')
-        countryy = address.get('country', '')  
-        city = cityy
-        state = statee
-        country = countryy
+        
+        # Try to get location information with proper error handling
+        try:
+            g = geocoder.ip('me')
+            latlong = g.latlng
+            geolocator = Nominatim(user_agent="http", timeout=10)
+            location = geolocator.reverse(latlong, language='en')
+            address = location.raw['address']
+            cityy = address.get('city', '')
+            statee = address.get('state', '')
+            countryy = address.get('country', '')  
+            city = cityy
+            state = statee
+            country = countryy
+        except Exception as e:
+            print(f"⚠️ Geocoding failed: {e}")
+            # Use fallback location data
+            latlong = [0.0, 0.0]
+            city = "Unknown"
+            state = "Unknown"
+            country = "Unknown"
 
 
         # Upload Resume
@@ -476,7 +539,7 @@ def run():
                 time.sleep(4)
         
             ### saving the uploaded resume to folder
-            save_image_path = './Uploaded_Resumes/'+pdf_file.name
+            save_image_path = os.path.join(script_dir, 'Uploaded_Resumes', pdf_file.name)
             pdf_name = pdf_file.name
             with open(save_image_path, "wb") as f:
                 f.write(pdf_file.getbuffer())
