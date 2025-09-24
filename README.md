@@ -263,6 +263,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 👥 Authors
 
 - **Shripad735** - *Initial work* - [GitHub](https://github.com/Shripad735)
+- **RuturajD1517** - *Final work* - [GitHub](https://github.com/DeshmukhRuturaj)
+
 
 ## 🙏 Acknowledgments
 
